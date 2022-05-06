@@ -1,0 +1,26 @@
+<annotation>
+  <folder>Rumex_Docknet_ALA_site</folder>
+  <filename>1171.jpg</filename>
+  <path>/content/Annotation/images/Rumex_Docknet_ALA_site</path>
+  <source>
+    <database>Unknown</database>
+  </source>
+  <size>
+    <width>256</width>
+    <height>256</height>
+    <depth>3</depth>
+  </size>
+  <segmented>0</segmented>
+  <object>
+    <name>rumex</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+      <xmin>144</xmin>
+      <ymin>86</ymin>
+      <xmax>240</xmax>
+      <ymax>146</ymax>
+    </bndbox>
+  </object>
+</annotation>
