@@ -7,6 +7,7 @@ import scipy
 import numpy
 import glob
 import matplotlib.pyplot as plt
+from matplotlib import colors, cm
 from PIL import Image
 
 import tensorflow as tf
@@ -92,50 +93,92 @@ test_image_generator = val_datagen.flow(image_list_test, batch_size = batch_size
 test_mask_generator = val_datagen.flow(mask_list_test, batch_size = batch_size, seed=4)
 test_generator = crop_generator(zip(test_image_generator, test_mask_generator), image_size)
 
+# Visualise the training and test images & masks
 sample = next(train_generator)
-fig = plt.figure(figsize=[5, 4])
-for i,img in enumerate(sample[0]):
-    if (i < 32):
-        ax = fig.add_subplot(8, 8, i*2 + 1)
-        ax.imshow(img, extent=[0, 256, 0, 256])
-        ax = fig.add_subplot(8, 8, i*2 + 2)
-        ax.imshow(categorical_to_mask(sample[1][i,:,:,:]))
+# fig = plt.figure(figsize=[5, 4])
+# for i,img in enumerate(sample[0]):
+#     if (i < 32):
+#         ax = fig.add_subplot(8, 8, i*2 + 1)
+#         ax.imshow(img, extent=[0, 256, 0, 256])
+#         ax = fig.add_subplot(8, 8, i*2 + 2)
+#         ax.imshow(categorical_to_mask(sample[1][i,:,:,:]))
 
 test_data, test_gt = next(test_generator)
-fig = plt.figure(figsize=[5, 4])
-for i,img in enumerate(test_data):
-    if (i < 32):
-        ax = fig.add_subplot(8, 8, i*2 + 1)
-        ax.imshow(img, extent=[0, 256, 0, 256])
-        ax = fig.add_subplot(8, 8, i*2 + 2)
-        ax.imshow(categorical_to_mask(test_gt[i,:,:,:]))
+# fig = plt.figure(figsize=[5, 4])
+# for i,img in enumerate(test_data):
+#     if (i < 32):
+#         ax = fig.add_subplot(8, 8, i*2 + 1)
+#         ax.imshow(img, extent=[0, 256, 0, 256])
+#         ax = fig.add_subplot(8, 8, i*2 + 2)
+#         ax.imshow(categorical_to_mask(test_gt[i,:,:,:]))
 
 # plt.show()
 
 # input, colour images
-# input_img = Input(shape=(image_size, image_size, 3))
+def model1():
+    input_img = Input(shape=(image_size, image_size, 3))
 
-# # encoder, add more filters as we go deeper
-# x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-# x = MaxPooling2D((2, 2), padding='same')(x)
-# x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
-# x = MaxPooling2D((2, 2), padding='same')(x)
-# x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-# x = MaxPooling2D((2, 2), padding='same')(x)
+    # encoder, add more filters as we go deeper
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
+    x = MaxPooling2D((2, 2), padding='same')(x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    x = MaxPooling2D((2, 2), padding='same')(x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    x = MaxPooling2D((2, 2), padding='same')(x)
 
-# # decoder, reduce filters as we go back up
-# x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-# x = UpSampling2D((2, 2))(x)
-# x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
-# x = UpSampling2D((2, 2))(x)
-# x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
-# x = UpSampling2D((2, 2))(x)
+    # decoder, reduce filters as we go back up
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
 
-# # output, 12 channels for 12 classes
-# decoded = Conv2D(2, (1, 1), activation='softmax', padding='same')(x)
+    # output, 12 channels for 12 classes
+    decoded = Conv2D(2, (1, 1), activation='softmax', padding='same')(x)
 
-# segmenter = Model(input_img, decoded)
-# print(segmenter.summary())
+    segmenter = Model(input_img, decoded)
+    print(segmenter.summary())
+    return segmenter
+
+
+def model2():
+    input_img = Input(shape=(image_size, image_size, 3))
+
+    conv1 = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
+    conv1 = Conv2D(16, (3, 3), activation='relu', padding='same')(conv1)
+    pool1 = MaxPooling2D((2, 2), padding='same')(conv1)
+
+    conv2 = Conv2D(32, (3, 3), activation='relu', padding='same')(pool1)
+    conv2 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv2)
+    pool2 = MaxPooling2D((2, 2), padding='same')(conv2)
+
+    conv3 = Conv2D(64, (3, 3), activation='relu', padding='same')(pool2)
+    conv3 = Conv2D(64, (3, 3), activation='relu', padding='same')(conv3)
+    pool3 = MaxPooling2D((2, 2), padding='same')(conv3)
+
+    conv4 = Conv2D(128, (3, 3), activation='relu', padding='same')(pool3)
+    conv4 = Conv2D(128, (3, 3), activation='relu', padding='same')(conv4)
+
+    up1 = UpSampling2D((2, 2))(conv4)
+    merge1 = concatenate([conv3,up1], axis = 3)
+    conv5 = Conv2D(64, (3, 3), activation='relu', padding='same')(merge1)
+    conv5 = Conv2D(64, (3, 3), activation='relu', padding='same')(conv5)
+
+    up2 = UpSampling2D((2, 2))(conv5)
+    merge2 = concatenate([conv2,up2], axis = 3)
+    conv6 = Conv2D(32, (3, 3), activation='relu', padding='same')(merge2)
+    conv6 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv6)
+
+    up3 = UpSampling2D((2, 2))(conv6)
+    merge3 = concatenate([conv1,up3], axis = 3)
+    conv7 = Conv2D(16, (3, 3), activation='relu', padding='same')(merge3)
+    conv7 = Conv2D(16, (3, 3), activation='relu', padding='same')(conv7)
+    decoded = Conv2D(2, (1, 1), activation='softmax', padding='same')(conv7)
+
+    segmenter = Model(input_img, decoded)
+    print(segmenter.summary())
+    return segmenter
 
 
 def focal_loss(target, output, gamma=2):
@@ -160,63 +203,37 @@ def create_optimiser():
 steps_per_epoch = 100
 epochs = 1
 
-# segmenter.compile(optimizer=create_optimiser(), loss=focal_loss)
-# segmenter.fit(train_generator, steps_per_epoch = steps_per_epoch, epochs = epochs,
-#               validation_data=test_generator, validation_steps = 10, callbacks=create_callbacks())
-
 def visualise(model, test_data, test_gt):
     pred = model.predict(test_data)
     fig = plt.figure(figsize=[5, 4])
+    norm = colors.Normalize()
+    cmap = cm.hsv
+    background = colors.colorConverter.to_rgba('g')
+    weed = colors.colorConverter.to_rgba('r')
     for i,img in enumerate(test_data):
         if (i < 32):
-            ax = fig.add_subplot(8, 12, i*3 + 1)
+            #Original image
+            ax = fig.add_subplot(8, 8, i*2 + 1)
             ax.imshow(img)
-            ax = fig.add_subplot(8, 12, i*3 + 2)
-            ax.imshow(categorical_to_mask(test_gt[i,:,:,:]))
-            ax = fig.add_subplot(8, 12, i*3 + 3)
-            ax.imshow(categorical_to_mask(pred[i,:,:,:]))
+            #Image with label mask
+            # ax = fig.add_subplot(8, 12, i*3 + 2)
+            # maskOverlay = cmap(norm(categorical_to_mask(test_gt[i,:,:,:])))
+            # maskOverlay[categorical_to_mask(test_gt[i,:,:,:])<=0,:] = background
+            # maskOverlay[categorical_to_mask(test_gt[i,:,:,:])>0,:] = weed
+            # ax.imshow(img)
+            # ax.imshow(maskOverlay, alpha = 0.3)
+            #Image with prediction mask
+            ax = fig.add_subplot(8, 8, i*2 + 2)
+            predOverlay = cmap(norm(categorical_to_mask(pred[i,:,:,:])))
+            predOverlay[categorical_to_mask(pred[i,:,:,:])<=0,:] = background
+            predOverlay[categorical_to_mask(pred[i,:,:,:])>0,:] = weed
+            ax.imshow(img)
+            ax.imshow(predOverlay, alpha = 0.3 )
 
-input_img = Input(shape=(image_size, image_size, 3))
-
-conv1 = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-conv1 = Conv2D(16, (3, 3), activation='relu', padding='same')(conv1)
-pool1 = MaxPooling2D((2, 2), padding='same')(conv1)
-
-conv2 = Conv2D(32, (3, 3), activation='relu', padding='same')(pool1)
-conv2 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv2)
-pool2 = MaxPooling2D((2, 2), padding='same')(conv2)
-
-conv3 = Conv2D(64, (3, 3), activation='relu', padding='same')(pool2)
-conv3 = Conv2D(64, (3, 3), activation='relu', padding='same')(conv3)
-pool3 = MaxPooling2D((2, 2), padding='same')(conv3)
-
-conv4 = Conv2D(128, (3, 3), activation='relu', padding='same')(pool3)
-conv4 = Conv2D(128, (3, 3), activation='relu', padding='same')(conv4)
-
-up1 = UpSampling2D((2, 2))(conv4)
-merge1 = concatenate([conv3,up1], axis = 3)
-conv5 = Conv2D(64, (3, 3), activation='relu', padding='same')(merge1)
-conv5 = Conv2D(64, (3, 3), activation='relu', padding='same')(conv5)
-
-up2 = UpSampling2D((2, 2))(conv5)
-merge2 = concatenate([conv2,up2], axis = 3)
-conv6 = Conv2D(32, (3, 3), activation='relu', padding='same')(merge2)
-conv6 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv6)
-
-up3 = UpSampling2D((2, 2))(conv6)
-merge3 = concatenate([conv1,up3], axis = 3)
-conv7 = Conv2D(16, (3, 3), activation='relu', padding='same')(merge3)
-conv7 = Conv2D(16, (3, 3), activation='relu', padding='same')(conv7)
-decoded = Conv2D(2, (1, 1), activation='softmax', padding='same')(conv7)
-
-segmenter = Model(input_img, decoded)
-print(segmenter.summary())
-
-segmenter.compile(optimizer=create_optimiser(), loss=focal_loss)
-segmenter.fit(train_generator, steps_per_epoch = steps_per_epoch, epochs = epochs,
+model = model2()
+model.compile(optimizer=create_optimiser(), loss=focal_loss, metrics='accuracy')
+model.fit(train_generator, steps_per_epoch = steps_per_epoch, epochs = epochs,
               validation_data=test_generator, validation_steps = 10, callbacks=create_callbacks())
-
-visualise(segmenter, test_data, test_gt)
+model.evaluate(test_data, test_gt)
+visualise(model, test_data, test_gt)
 plt.show()
-
-segmenter.evaluate(test_generator)
