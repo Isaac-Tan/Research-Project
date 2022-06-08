@@ -1,10 +1,11 @@
+from gettext import npgettext
 import os
 from tkinter import N
 from cv2 import imshow
 os. environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import scipy
-import numpy
+import numpy as np
 import glob
 import matplotlib.pyplot as plt
 from matplotlib import colors, cm
@@ -28,21 +29,21 @@ def load_files(path, target_size, scale_factor):
         im = Image.open(filename)
         w, h = im.size
         im = im.resize((target_size, target_size))
-        im=numpy.asarray(im) / scale_factor
+        im=np.asarray(im) / scale_factor
         image_list.append(im)
-    return numpy.asarray(image_list)
+    return np.asarray(image_list)
 
 image_list_train = load_files(data_path + '/images/train/*.jpg', 256, 255.0)
 mask_list_train = load_files(data_path + '/masks/train/*.png', 256, 1.0)
-mask_list_train = numpy.reshape(mask_list_train, (numpy.shape(mask_list_train) + (1, )))
+mask_list_train = np.reshape(mask_list_train, (np.shape(mask_list_train) + (1, )))
 image_list_test = load_files(data_path + '/images/test/*.jpg', 256, 255.0)
 mask_list_test = load_files(data_path + '/masks/test/*.png', 256, 1.0)
-mask_list_test = numpy.reshape(mask_list_test, (numpy.shape(mask_list_test) + (1, )))
+mask_list_test = np.reshape(mask_list_test, (np.shape(mask_list_test) + (1, )))
 
-# print(numpy.shape(image_list_train))
-# print(numpy.shape(mask_list_train))
-# print(numpy.shape(image_list_test))
-# print(numpy.shape(mask_list_test))
+print(np.shape(image_list_train))
+print(np.shape(mask_list_train))
+print(np.shape(image_list_test))
+print(np.shape(mask_list_test))
 
 
 def mask_to_categorical(im, num_classes):    
@@ -62,8 +63,8 @@ def random_crop(img_x, img_y, random_crop_size):
 
     height, width = img_x.shape[0], img_x.shape[1]
     dy, dx = random_crop_size
-    # x = numpy.random.randint(0, width - dx + 1)
-    # y = numpy.random.randint(0, height - dy + 1)
+    # x = np.random.randint(0, width - dx + 1)
+    # y = np.random.randint(0, height - dy + 1)
     x = 0
     y = 0
     return img_x[y:(y+dy), x:(x+dx), :], img_y[y:(y+dy), x:(x+dx), :]
@@ -74,8 +75,8 @@ def crop_generator(batches, crop_length):
     """
     while True:
         batch_x, batch_y = next(batches)
-        batch_crops_x = numpy.zeros((batch_x.shape[0], crop_length, crop_length, 3))
-        batch_crops_y = numpy.zeros((batch_x.shape[0], crop_length, crop_length, 1))
+        batch_crops_x = np.zeros((batch_x.shape[0], crop_length, crop_length, 3))
+        batch_crops_y = np.zeros((batch_x.shape[0], crop_length, crop_length, 1))
         for i in range(batch_x.shape[0]):
             batch_crops_x[i], batch_crops_y[i] = random_crop(batch_x[i], batch_y[i], (crop_length, crop_length))
         yield (batch_crops_x, mask_to_categorical(batch_crops_y, 2))
@@ -83,14 +84,18 @@ def crop_generator(batches, crop_length):
 batch_size = 32
 image_size = 64
 
-train_datagen = ImageDataGenerator(zoom_range=0, horizontal_flip=True)
-train_image_generator = train_datagen.flow(image_list_train, batch_size = batch_size, seed=4)
-train_mask_generator = train_datagen.flow(mask_list_train, batch_size = batch_size, seed=4)
+train_datagen = ImageDataGenerator(zoom_range=0, horizontal_flip=True, validation_split = 0.1)
+train_image_generator = train_datagen.flow(image_list_train, batch_size = batch_size, seed=4, subset = 'training')
+train_mask_generator = train_datagen.flow(mask_list_train, batch_size = batch_size, seed=4, subset = 'training')
 train_generator = crop_generator(zip(train_image_generator, train_mask_generator), image_size)
 
-val_datagen = ImageDataGenerator(zoom_range=0)
-test_image_generator = val_datagen.flow(image_list_test, batch_size = batch_size, seed=4)
-test_mask_generator = val_datagen.flow(mask_list_test, batch_size = batch_size, seed=4)
+val_image_generator = train_datagen.flow(image_list_train, batch_size = batch_size, seed=4, subset = 'validation')
+val_mask_generator = train_datagen.flow(mask_list_train, batch_size = batch_size, seed=4, subset = 'validation')
+val_generator = crop_generator(zip(val_image_generator, val_mask_generator), image_size)
+
+test_datagen = ImageDataGenerator(zoom_range=0)
+test_image_generator = test_datagen.flow(image_list_test, batch_size = batch_size, seed=4)
+test_mask_generator = test_datagen.flow(mask_list_test, batch_size = batch_size, seed=4)
 test_generator = crop_generator(zip(test_image_generator, test_mask_generator), image_size)
 
 # Visualise the training and test images & masks
@@ -201,9 +206,9 @@ def create_callbacks():
 def create_optimiser():
     return tf.keras.optimizers.Adam()
 steps_per_epoch = 100
-epochs = 1
+epochs = 5
 
-def visualise(model, test_data, test_gt):
+def visualise(model, test_data):
     pred = model.predict(test_data)
     fig = plt.figure(figsize=[5, 4])
     norm = colors.Normalize()
@@ -231,9 +236,14 @@ def visualise(model, test_data, test_gt):
             ax.imshow(predOverlay, alpha = 0.3 )
 
 model = model2()
-model.compile(optimizer=create_optimiser(), loss=focal_loss, metrics='accuracy')
-model.fit(train_generator, steps_per_epoch = steps_per_epoch, epochs = epochs,
-              validation_data=test_generator, validation_steps = 10, callbacks=create_callbacks())
-model.evaluate(test_data, test_gt)
-visualise(model, test_data, test_gt)
+model.compile(optimizer=create_optimiser(), loss='binary_crossentropy', metrics='accuracy')
+# model.compile(optimizer=create_optimiser(), loss = focal_loss, metrics='accuracy')
+# model.fit(train_generator, steps_per_epoch = steps_per_epoch, epochs = epochs,
+#               validation_data=test_generator, validation_steps = 10, callbacks=create_callbacks())
+model.fit(train_generator, steps_per_epoch = steps_per_epoch, epochs = epochs, validation_data = val_generator, validation_steps = 10,
+              callbacks=create_callbacks())
+
+model.evaluate(test_generator, steps = 100, batch_size = batch_size)
+
+visualise(model, test_data)
 plt.show()
