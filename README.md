@@ -1,4 +1,4 @@
-# EGH400 - Engineering Research Project: Segmentation and Classifcation of Weeds
+# Engineering Research Project: Segmentation and Classifcation of Weeds
  
 ## Abstract
 
